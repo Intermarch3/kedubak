@@ -22,6 +22,7 @@ func main() {
 	api.UserRoutes(app, client, tokenChecker)
 	api.AuthRoutes(app, client, tokenChecker)
 	api.PostRoutes(app, client, tokenChecker)
+	api.CommentRoutes(app, client, tokenChecker)
 
 	// Disconnect from the server
 	defer func() {

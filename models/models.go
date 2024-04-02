@@ -23,6 +23,7 @@ type Comment struct {
 }
 
 type Post struct {
+    ID        primitive.ObjectID `json:"_id" bson:"_id,omitempty"`
     CreatedAt time.Time `json:"createdAt" bson:"createdAt,omitempty"`
     UserId    string    `json:"userId" bson:"userId,omitempty"`
     FirstName string    `json:"firstName" bson:"firstName,omitempty"`

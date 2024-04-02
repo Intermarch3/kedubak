@@ -19,6 +19,170 @@ func PostRoutes(app *fiber.App, client *mongo.Client, tokenChecker fiber.Handler
 	GetPosts(client, post)
 	CreatePost(client, post)
 	GetMyPosts(client, post)
+	getPostById(client, post)
+	deletePostById(client, post)
+	addVote(client, post)
+}
+
+func addVote(client *mongo.Client, post fiber.Router) {
+	post.Post("/vote/:id", func(c *fiber.Ctx) error {
+		// Get the token from the header Authorization
+		token := c.Get("Authorization")
+		UserId, err := jwt.GetUserID(token, client)
+		if err != nil {
+			return c.Status(http.StatusUnauthorized).JSON(fiber.Map{
+				"error": "wrong token",
+			})
+		}
+
+		// Check if the user has already voted in the last minute
+		lastTime := getUserVoteTime(client, UserId)
+		if lastTime.Add(time.Minute * 1).After(time.Now()) {
+			return c.Status(http.StatusForbidden).JSON(fiber.Map{
+				"error": "You can only vote once per minute",
+			})
+		}
+
+		postCollection := client.Database("keduback").Collection("Post")
+		postID := c.Params("id")
+		objId, _ := primitive.ObjectIDFromHex(postID)
+		//get the post
+		post := models.Post{}
+		err = postCollection.FindOne(context.Background(), bson.M{"_id": objId}).Decode(&post)
+		if err != nil {
+			return c.Status(http.StatusNotFound).JSON(fiber.Map{
+				"error": "Post not found",
+			})
+		}
+
+		// Check if the user has already voted
+		for _, vote := range post.UpVotes {
+			if vote == UserId {
+				return c.Status(http.StatusConflict).JSON(fiber.Map{
+					"error": "User has already voted",
+				})
+			}
+		}
+
+		// Update the user vote time
+		updateUserVoteTime(client, UserId)
+
+		// Add the user to the upvotes
+		post.UpVotes = append(post.UpVotes, UserId)
+
+		// Update the post
+		_, err = postCollection.UpdateOne(context.Background(), bson.M{"_id": objId}, bson.M{"$set": bson.M{"upVotes": post.UpVotes}})
+		if err != nil {
+			return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+				"error": "Internal Server Error",
+			})
+		}
+
+		return c.Status(http.StatusOK).JSON(fiber.Map{
+			"ok": true,
+			"message": "post upvoted",
+		})
+	})
+}
+
+func deletePostById(client *mongo.Client, post fiber.Router) {
+	post.Delete("/:id", func(c *fiber.Ctx) error {
+		// Get the token from the header Authorization
+		token := c.Get("Authorization")
+		UserId, err := jwt.GetUserID(token, client)
+		if err != nil {
+			return c.Status(http.StatusUnauthorized).JSON(fiber.Map{
+				"error": "wrong token",
+			})
+		}
+
+		postCollection := client.Database("keduback").Collection("Post")
+		postID := c.Params("id")
+		objId, _ := primitive.ObjectIDFromHex(postID)
+		//get the post
+		post := models.Post{}
+		err = postCollection.FindOne(context.Background(), bson.M{"_id": objId}).Decode(&post)
+		if err != nil {
+			return c.Status(http.StatusNotFound).JSON(fiber.Map{
+				"error": "Post not found",
+			})
+		}
+
+		// Check if the user is the owner of the post
+		if post.UserId != UserId {
+			return c.Status(http.StatusUnauthorized).JSON(fiber.Map{
+				"error": "Unauthorized",
+			})
+		}
+
+		//delete post
+		_, err = postCollection.DeleteOne(context.Background(), bson.M{"_id": objId})
+		if err != nil {
+			return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+				"error": "Internal Server Error",
+			})
+		}
+
+		// change nil array to empty array
+		if (post.UpVotes == nil) {
+			post.UpVotes = []string{}
+		}
+		if (post.Comments == nil) {
+			post.Comments = []models.Comment{}
+		}
+
+		return c.Status(http.StatusOK).JSON(fiber.Map{
+			"ok": true,
+			"data": fiber.Map{
+				"createdAt": post.CreatedAt,
+				"userId": post.UserId,
+				"firstName": post.FirstName,
+				"title": post.Title,
+				"content": post.Content,
+				"comments": post.Comments,
+				"upVotes": post.UpVotes,
+				"removed": true,
+			},
+		})
+	})
+}
+
+func getPostById(client *mongo.Client, post fiber.Router) {
+	post.Get("/:id", func(c *fiber.Ctx) error {
+		// Get the token from the header Authorization
+		token := c.Get("Authorization")
+		_, err := jwt.GetUserID(token, client)
+		if err != nil {
+			return c.Status(http.StatusUnauthorized).JSON(fiber.Map{
+				"error": "wrong token",
+			})
+		}
+
+		postCollection := client.Database("keduback").Collection("Post")
+		postID := c.Params("id")
+		objId, _ := primitive.ObjectIDFromHex(postID)
+		//get the post
+		post := models.Post{}
+		err = postCollection.FindOne(context.Background(), bson.M{"_id": objId}).Decode(&post)
+		if err != nil {
+			return c.Status(http.StatusNotFound).JSON(fiber.Map{
+				"error": "Post not found",
+			})
+		}
+
+		// change nil array to empty array
+		if (post.UpVotes == nil) {
+			post.UpVotes = []string{}
+		}
+		if (post.Comments == nil) {
+			post.Comments = []models.Comment{}
+		}
+
+		return c.Status(http.StatusOK).JSON(fiber.Map{
+			"ok": true,
+			"data": post,
+		})
+	})
 }
 
 func GetMyPosts(client *mongo.Client, post fiber.Router) {

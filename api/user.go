@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"net/http"
+	"time"
 
 	"github.com/Taker-Academy/kedubak-Intermarch3/jwt"
 	"github.com/Taker-Academy/kedubak-Intermarch3/models"
@@ -149,4 +150,24 @@ func Me(client *mongo.Client, user fiber.Router) {
 			},
 		})
 	})
+}
+
+func getUserVoteTime(client *mongo.Client, id string) time.Time {
+	userCollection := client.Database("keduback").Collection("User")
+	objId, _ := primitive.ObjectIDFromHex(id)
+	user := models.User{}
+	err := userCollection.FindOne(context.Background(), bson.M{"_id": objId}).Decode(&user)
+	if err != nil {
+		return time.Now()
+	} else {
+		return user.LastUpVote
+	}
+}
+
+func updateUserVoteTime(client *mongo.Client, id string) {
+	userCollection := client.Database("keduback").Collection("User")
+	objId, _ := primitive.ObjectIDFromHex(id)
+	user := models.User{}
+	user.LastUpVote = time.Now()
+	userCollection.UpdateOne(context.Background(), bson.M{"_id": objId}, bson.M{"$set": user})
 }

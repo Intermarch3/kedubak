@@ -1,19 +1,33 @@
 package main
 
 import (
-	"fmt"
-	"keduback/db"
 	"github.com/gofiber/fiber/v2"
+	"context"
+	"github.com/Taker-Academy/kedubak-Intermarch3/db"
+	"github.com/Taker-Academy/kedubak-Intermarch3/jwt"
+	"github.com/Taker-Academy/kedubak-Intermarch3/api"
+	"github.com/gofiber/fiber/v2/middleware/cors"
 )
+
+const jwtSecret = "mdpsecret"
+
 
 func main() {
 	app := fiber.New()
 	client := db.ConnectToDb()
-	// Define your routes
-	app.Get("/", func(c *fiber.Ctx) error {
-		fmt.Println("get / called")
-		return c.SendString("Hello, Coders! Welcome to Go programming language.")
-	})
-	fmt.Println(client.NumberSessionsInProgress())
+	tokenChecker := jwt.NewAuthMiddleware(jwtSecret)
+
+	// Define the routes
+	app.Use(cors.New())
+	api.UserRoutes(app, client, tokenChecker)
+	api.AuthRoutes(app, client, tokenChecker)
+	api.PostRoutes(app, client, tokenChecker)
+
+	// Disconnect from the server
+	defer func() {
+		if err := client.Disconnect(context.TODO()); err != nil {
+			panic(err)
+		}
+	}()
     app.Listen(":8080")
 }

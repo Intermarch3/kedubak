@@ -4,6 +4,7 @@ services:
     build: .
     environment:
         MONGODB_URI: ${MONGODB_URI}
+        SECRET_STR: ${SECRET_STR}
     ports:
       - 8080:8080
   app:

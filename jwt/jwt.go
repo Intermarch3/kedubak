@@ -1,26 +1,21 @@
 package jwt
 
 import (
-	"time"
 	"context"
+	"os"
+	"time"
+
+	"github.com/Taker-Academy/kedubak-Intermarch3/models"
+	"github.com/gofiber/fiber/v2"
+	jwtware "github.com/gofiber/jwt/v3"
+	jtoken "github.com/golang-jwt/jwt/v4"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
-	"github.com/gofiber/fiber/v2"
-	"github.com/Taker-Academy/kedubak-Intermarch3/models"
-	jwtware "github.com/gofiber/jwt/v3"
-	jtoken "github.com/golang-jwt/jwt/v4"
 )
 
-const jwtSecret = "mdpsecret"
-
-type loginRequest struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
-}
-
 func GetSecret() string {
-	return jwtSecret
+	return os.Getenv("SECRET_STR")
 }
 
 func GetClaims(tokenString string) (*jtoken.Token, error) {
@@ -76,46 +71,5 @@ func NewAuthMiddleware(secret string) fiber.Handler {
 				"error": "wrong token",
 			})
 		},
-	})
-}
-
-func Login(c *fiber.Ctx) error {
-	// Extract the credentials from the request body
-	log := new(loginRequest)
-	// Parse the body into the loginRequest struct
-	if err := c.BodyParser(log); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": err.Error(),
-		})
-	}
-	// Find the user by credentials
-	if log.Email != "lucas@gmail.com" || log.Password != "123" {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"error": "Unauthorized",
-		})
-	}
-
-	userID := 1
-
-	// Create the JWT claims, which includes the user ID and expiry time
-	claims := jtoken.MapClaims{
-		"ID":    userID,
-		"exp":   time.Now().Add(time.Hour * 24 * 1).Unix(),
-	}
-
-	// Create token
-	token := jtoken.NewWithClaims(jtoken.SigningMethodHS256, claims)
-
-	// Generate encoded token and send it as response.
-	t, err := token.SignedString([]byte(jwtSecret))
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
-	}
-
-	// Return the token
-	return c.JSON(fiber.Map{
-		"token": t,
 	})
 }

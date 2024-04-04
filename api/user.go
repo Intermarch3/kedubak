@@ -102,7 +102,13 @@ func Edit(client *mongo.Client, user fiber.Router) {
 			user.LastName = newUser.LastName
 		}
 		if (newUser.Password != "") {
-			user.Password = newUser.Password
+			hash, err := HashPassword(newUser.Password)
+			if err != nil {
+				return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+					"error": "Internal Server Error",
+				})
+			}
+			user.Password = hash
 		}
 
 		_, err = userCollection.UpdateOne(context.Background(), bson.M{"_id": objId}, bson.M{"$set": user})

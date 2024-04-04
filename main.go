@@ -3,19 +3,21 @@ package main
 import (
 	"github.com/gofiber/fiber/v2"
 	"context"
+	"os"
 	"github.com/Taker-Academy/kedubak-Intermarch3/db"
 	"github.com/Taker-Academy/kedubak-Intermarch3/jwt"
 	"github.com/Taker-Academy/kedubak-Intermarch3/api"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 )
 
-const jwtSecret = "mdpsecret"
-
-
 func main() {
+	secret := os.Getenv("SECRET_STR")
+	if secret == "" {
+		panic("SECRET_STR is not set")
+	}
 	app := fiber.New()
 	client := db.ConnectToDb()
-	tokenChecker := jwt.NewAuthMiddleware(jwtSecret)
+	tokenChecker := jwt.NewAuthMiddleware(secret)
 
 	// Define the routes
 	app.Use(cors.New())

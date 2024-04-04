@@ -33,7 +33,7 @@ func Login(client *mongo.Client, auth fiber.Router) {
 
 		userCollection := client.Database("keduback").Collection("User")
 
-		// Check if user with the same email already exists
+		// get user from db
 		existingUser := models.User{}
 		err := userCollection.FindOne(context.Background(), bson.M{"email": loginRequest.Email}).Decode(&existingUser)
 		if err != nil {
@@ -43,7 +43,7 @@ func Login(client *mongo.Client, auth fiber.Router) {
 		}
 
 		// Check if the password is correct
-		if existingUser.Password != loginRequest.Password {
+		if !CheckPasswordHash(loginRequest.Password, existingUser.Password) {
 			return c.Status(http.StatusUnauthorized).JSON(fiber.Map{
 				"error": "wrong credentials",
 			})
@@ -95,6 +95,13 @@ func Register(client *mongo.Client, auth fiber.Router) {
 		}
 
 		// Hash the password
+		hash, err := HashPassword(newUser.Password)
+		if err != nil {
+			return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+				"error": "Internal Server Error",
+			})
+		}
+		newUser.Password = hash
 
 		// Insert user into the database
 		newUser.CreatedAt = time.Now()

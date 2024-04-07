@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"time"
+
 	"github.com/Taker-Academy/kedubak-Intermarch3/jwt"
 	"github.com/Taker-Academy/kedubak-Intermarch3/models"
 	"github.com/gofiber/fiber/v2"
@@ -313,7 +314,7 @@ func CreatePost(client *mongo.Client, post fiber.Router) {
 			UpVotes:   []string{},
 		}
 
-		_, err = postCollection.InsertOne(context.Background(), newPost)
+		res, err := postCollection.InsertOne(context.Background(), newPost)
 		// ajout d'une reponse en cas d'erreur (non noter sur la doc)
 		if err != nil {
 			return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
@@ -321,6 +322,9 @@ func CreatePost(client *mongo.Client, post fiber.Router) {
 				"error": "Internal Server Error",
 			})
 		}
+
+		// ajout de l'id du post
+		newPost.ID = res.InsertedID.(primitive.ObjectID)
 
 		return c.Status(http.StatusCreated).JSON(fiber.Map{
 			"ok": true,

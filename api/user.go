@@ -55,6 +55,16 @@ func Remove(client *mongo.Client, user fiber.Router) {
 			})
 		}
 
+		//delete all posts of the user
+		postCollection := client.Database("keduback").Collection("Post")
+		_, err = postCollection.DeleteMany(context.Background(), bson.M{"userId": id})
+		if err != nil {
+			return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+				"ok": false,
+				"error": "Internal Server Error",
+			})
+		}
+
 		return c.Status(http.StatusOK).JSON(fiber.Map{
 			"ok": true,
 			"data": fiber.Map{

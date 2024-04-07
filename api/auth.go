@@ -27,6 +27,7 @@ func Login(client *mongo.Client, auth fiber.Router) {
 		var loginRequest models.User
 		if err := c.BodyParser(&loginRequest); err != nil || loginRequest.Email == "" || loginRequest.Password == "" {
 			return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+				"ok": false,
 				"error": "Bad Request",
 			})
 		}
@@ -38,13 +39,15 @@ func Login(client *mongo.Client, auth fiber.Router) {
 		err := userCollection.FindOne(context.Background(), bson.M{"email": loginRequest.Email}).Decode(&existingUser)
 		if err != nil {
 			return c.Status(http.StatusUnauthorized).JSON(fiber.Map{
-				"error": "Unauthorized",
+				"ok": false,
+				"error": "wrong credentials",
 			})
 		}
 
 		// Check if the password is correct
 		if !CheckPasswordHash(loginRequest.Password, existingUser.Password) {
 			return c.Status(http.StatusUnauthorized).JSON(fiber.Map{
+				"ok": false,
 				"error": "wrong credentials",
 			})
 		}
@@ -54,6 +57,7 @@ func Login(client *mongo.Client, auth fiber.Router) {
 		token := jwt.GetToken(userID)
 		if token == "" {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"ok": false,
 				"error": "Internal Server Error",
 			})
 		}
@@ -79,6 +83,7 @@ func Register(client *mongo.Client, auth fiber.Router) {
 		if err := c.BodyParser(&newUser); err != nil || newUser.Email == "" ||
 			newUser.Password == "" || newUser.FirstName == "" || newUser.LastName == "" {
 			return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+				"ok": false,
 				"error": "Bad Request",
 			})
 		}
@@ -89,7 +94,8 @@ func Register(client *mongo.Client, auth fiber.Router) {
 		existingUser := models.User{}
 		err := userCollection.FindOne(context.Background(), bson.M{"email": newUser.Email}).Decode(&existingUser)
 		if err == nil {
-			return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			return c.Status(http.StatusUnauthorized).JSON(fiber.Map{
+				"ok": false,
 				"error": "User with the same email already exists",
 			})
 		}
@@ -98,6 +104,7 @@ func Register(client *mongo.Client, auth fiber.Router) {
 		hash, err := HashPassword(newUser.Password)
 		if err != nil {
 			return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+				"ok": false,
 				"error": "Internal Server Error",
 			})
 		}
@@ -111,6 +118,7 @@ func Register(client *mongo.Client, auth fiber.Router) {
 		res, err := userCollection.InsertOne(context.Background(), newUser)
 		if err != nil {
 			return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+				"ok": false,
 				"error": "Internal Server Error",
 			})
 		}
@@ -120,6 +128,7 @@ func Register(client *mongo.Client, auth fiber.Router) {
 		token := jwt.GetToken(userID)
 		if token == "" {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"ok": false,
 				"error": "Internal Server Error",
 			})
 		}

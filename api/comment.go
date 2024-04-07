@@ -26,6 +26,7 @@ func addComment(client *mongo.Client, comment fiber.Router) {
 		UserId, err := jwt.GetUserID(token, client)
 		if err != nil {
 			return c.Status(http.StatusUnauthorized).JSON(fiber.Map{
+				"ok": false,
 				"error": "wrong token",
 			})
 		}
@@ -34,13 +35,20 @@ func addComment(client *mongo.Client, comment fiber.Router) {
 		var commentRequest models.Comment
 		if err := c.BodyParser(&commentRequest); err != nil || commentRequest.Content == "" {
 			return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+				"ok": false,
 				"error": "Bad Request",
 			})
 		}
 
 		// Get the user
 		userCollection := client.Database("keduback").Collection("User")
-		objId, _ := primitive.ObjectIDFromHex(UserId)
+		objId, err := primitive.ObjectIDFromHex(UserId)
+		if err != nil {
+			return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+				"ok": false,
+				"error": "Invalid ID",
+			})
+		}
 		user := models.User{}
 		_ = userCollection.FindOne(context.Background(), bson.M{"_id": objId}).Decode(&user)
 
@@ -59,8 +67,9 @@ func addComment(client *mongo.Client, comment fiber.Router) {
 		post := models.Post{}
 		err = postCollection.FindOne(context.Background(), bson.M{"_id": objId}).Decode(&post)
 		if err != nil {
-			return c.Status(http.StatusNotFound).JSON(fiber.Map{
-				"error": "Post not found",
+			return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+				"ok": false,
+				"error": "Invalid ID",
 			})
 		}
 
@@ -71,6 +80,7 @@ func addComment(client *mongo.Client, comment fiber.Router) {
 		_, err = postCollection.UpdateOne(context.Background(), bson.M{"_id": objId}, bson.M{"$set": bson.M{"comments": post.Comments}})
 		if err != nil {
 			return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+				"ok": false,
 				"error": "Internal Server Error",
 			})
 		}

@@ -31,6 +31,7 @@ func addVote(client *mongo.Client, post fiber.Router) {
 		UserId, err := jwt.GetUserID(token, client)
 		if err != nil {
 			return c.Status(http.StatusUnauthorized).JSON(fiber.Map{
+				"ok": false,
 				"error": "wrong token",
 			})
 		}
@@ -39,18 +40,26 @@ func addVote(client *mongo.Client, post fiber.Router) {
 		lastTime := getUserVoteTime(client, UserId)
 		if lastTime.Add(time.Minute * 1).After(time.Now()) {
 			return c.Status(http.StatusForbidden).JSON(fiber.Map{
+				"ok": false,
 				"error": "You can only vote once per minute",
 			})
 		}
 
 		postCollection := client.Database("keduback").Collection("Post")
 		postID := c.Params("id")
-		objId, _ := primitive.ObjectIDFromHex(postID)
+		objId, err := primitive.ObjectIDFromHex(postID)
+		if err != nil {
+			return c.Status(http.StatusUnprocessableEntity).JSON(fiber.Map{
+				"ok": false,
+				"error": "Invalid ID",
+			})
+		}
 		//get the post
 		post := models.Post{}
 		err = postCollection.FindOne(context.Background(), bson.M{"_id": objId}).Decode(&post)
 		if err != nil {
 			return c.Status(http.StatusNotFound).JSON(fiber.Map{
+				"ok": false,
 				"error": "Post not found",
 			})
 		}
@@ -59,7 +68,8 @@ func addVote(client *mongo.Client, post fiber.Router) {
 		for _, vote := range post.UpVotes {
 			if vote == UserId {
 				return c.Status(http.StatusConflict).JSON(fiber.Map{
-					"error": "User has already voted",
+					"ok": false,
+					"error": "Already voted for this post",
 				})
 			}
 		}
@@ -74,6 +84,7 @@ func addVote(client *mongo.Client, post fiber.Router) {
 		_, err = postCollection.UpdateOne(context.Background(), bson.M{"_id": objId}, bson.M{"$set": bson.M{"upVotes": post.UpVotes}})
 		if err != nil {
 			return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+				"ok": false,
 				"error": "Internal Server Error",
 			})
 		}
@@ -92,33 +103,49 @@ func deletePostById(client *mongo.Client, post fiber.Router) {
 		UserId, err := jwt.GetUserID(token, client)
 		if err != nil {
 			return c.Status(http.StatusUnauthorized).JSON(fiber.Map{
+				"ok": false,
 				"error": "wrong token",
 			})
 		}
 
 		postCollection := client.Database("keduback").Collection("Post")
 		postID := c.Params("id")
-		objId, _ := primitive.ObjectIDFromHex(postID)
+		objId, err := primitive.ObjectIDFromHex(postID)
+		if err != nil {
+			return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+				"ok": false,
+				"error": "Invalid ID",
+			})
+		}
 		//get the post
 		post := models.Post{}
 		err = postCollection.FindOne(context.Background(), bson.M{"_id": objId}).Decode(&post)
 		if err != nil {
 			return c.Status(http.StatusNotFound).JSON(fiber.Map{
+				"ok": false,
 				"error": "Post not found",
 			})
 		}
 
 		// Check if the user is the owner of the post
 		if post.UserId != UserId {
-			return c.Status(http.StatusUnauthorized).JSON(fiber.Map{
-				"error": "Unauthorized",
+			return c.Status(http.StatusForbidden).JSON(fiber.Map{
+				"ok": false,
+				"error": "user not the owner of the post",
 			})
 		}
 
 		//delete post
 		_, err = postCollection.DeleteOne(context.Background(), bson.M{"_id": objId})
 		if err != nil {
+			if err == mongo.ErrNoDocuments {
+				return c.Status(http.StatusNotFound).JSON(fiber.Map{
+					"ok": false,
+					"error": "Post not found",
+				})
+			}
 			return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+				"ok": false,
 				"error": "Internal Server Error",
 			})
 		}
@@ -154,19 +181,34 @@ func getPostById(client *mongo.Client, post fiber.Router) {
 		_, err := jwt.GetUserID(token, client)
 		if err != nil {
 			return c.Status(http.StatusUnauthorized).JSON(fiber.Map{
+				"ok": false,
 				"error": "wrong token",
 			})
 		}
 
 		postCollection := client.Database("keduback").Collection("Post")
 		postID := c.Params("id")
-		objId, _ := primitive.ObjectIDFromHex(postID)
+		objId, err := primitive.ObjectIDFromHex(postID)
+		if err != nil {
+			return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+				"ok": false,
+				"error": "Invalid ID",
+			})
+		}
+
 		//get the post
 		post := models.Post{}
 		err = postCollection.FindOne(context.Background(), bson.M{"_id": objId}).Decode(&post)
 		if err != nil {
-			return c.Status(http.StatusNotFound).JSON(fiber.Map{
-				"error": "Post not found",
+			if err == mongo.ErrNoDocuments {
+				return c.Status(http.StatusNotFound).JSON(fiber.Map{
+					"ok": false,
+					"error": "Post not found",
+				})
+			}
+			return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+				"ok": false,
+				"error": "Internal Server Error",
 			})
 		}
 
@@ -192,6 +234,7 @@ func GetMyPosts(client *mongo.Client, post fiber.Router) {
 		userID, err := jwt.GetUserID(token, client)
 		if err != nil {
 			return c.Status(http.StatusUnauthorized).JSON(fiber.Map{
+				"ok": false,
 				"error": "wrong token",
 			})
 		}
@@ -201,12 +244,14 @@ func GetMyPosts(client *mongo.Client, post fiber.Router) {
 		cursor, err := postCollection.Find(context.Background(), bson.M{"userId": userID})
 		if err != nil {
 			return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+				"ok": false,
 				"error": "Internal Server Error",
 			})
 		}
 		posts := []models.Post{}
 		if err = cursor.All(context.Background(), &posts); err != nil {
 			return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+				"ok": false,
 				"error": "Internal Server Error",
 			})
 		}
@@ -234,6 +279,7 @@ func CreatePost(client *mongo.Client, post fiber.Router) {
 		var postRequest models.Post
 		if err := c.BodyParser(&postRequest); err != nil || postRequest.Title == "" || postRequest.Content == "" {
 			return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+				"ok": false,
 				"error": "Bad Request",
 			})
 		}
@@ -243,6 +289,7 @@ func CreatePost(client *mongo.Client, post fiber.Router) {
 		userID, err := jwt.GetUserID(token, client)
 		if err != nil {
 			return c.Status(http.StatusUnauthorized).JSON(fiber.Map{
+				"ok": false,
 				"error": "wrong token",
 			})
 		}
@@ -267,8 +314,10 @@ func CreatePost(client *mongo.Client, post fiber.Router) {
 		}
 
 		_, err = postCollection.InsertOne(context.Background(), newPost)
+		// ajout d'une reponse en cas d'erreur (non noter sur la doc)
 		if err != nil {
 			return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+				"ok": false,
 				"error": "Internal Server Error",
 			})
 		}
@@ -287,12 +336,14 @@ func GetPosts(client *mongo.Client, post fiber.Router) {
 		cursor, err := postCollection.Find(context.Background(), bson.M{})
 		if err != nil {
 			return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+				"ok": false,
 				"error": "Internal Server Error",
 			})
 		}
 		posts := []models.Post{}
 		if err = cursor.All(context.Background(), &posts); err != nil {
 			return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+				"ok": false,
 				"error": "Internal Server Error",
 			})
 		}

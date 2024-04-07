@@ -29,6 +29,7 @@ func Remove(client *mongo.Client, user fiber.Router) {
 		id, err := jwt.GetUserID(token, client)
 		if err != nil {
 			return c.Status(http.StatusUnauthorized).JSON(fiber.Map{
+				"ok": false,
 				"error": "wrong token",
 			})
 		}
@@ -40,6 +41,7 @@ func Remove(client *mongo.Client, user fiber.Router) {
 		err = userCollection.FindOne(context.Background(), bson.M{"_id": objId}).Decode(&user)
 		if err != nil {
 			return c.Status(http.StatusNotFound).JSON(fiber.Map{
+				"ok": false,
 				"error": "User not found",
 			})
 		}
@@ -48,6 +50,7 @@ func Remove(client *mongo.Client, user fiber.Router) {
 		_, err = userCollection.DeleteOne(context.Background(), bson.M{"_id": objId})
 		if err != nil {
 			return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+				"ok": false,
 				"error": "Internal Server Error",
 			})
 		}
@@ -71,6 +74,7 @@ func Edit(client *mongo.Client, user fiber.Router) {
 		id, err := jwt.GetUserID(token, client)
 		if err != nil {
 			return c.Status(http.StatusUnauthorized).JSON(fiber.Map{
+				"ok": false,
 				"error": "wrong token",
 			})
 		}
@@ -80,6 +84,7 @@ func Edit(client *mongo.Client, user fiber.Router) {
 		if err := c.BodyParser(&newUser); err != nil || (newUser.Email == "" &&
 			newUser.FirstName == "" && newUser.LastName == "" && newUser.Password == "") {
 			return c.Status(http.StatusUnprocessableEntity).JSON(fiber.Map{
+				"ok": false,
 				"error": "unable to validate the request body",
 			})
 		}
@@ -105,6 +110,7 @@ func Edit(client *mongo.Client, user fiber.Router) {
 			hash, err := HashPassword(newUser.Password)
 			if err != nil {
 				return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+					"ok": false,
 					"error": "Internal Server Error",
 				})
 			}
@@ -114,6 +120,7 @@ func Edit(client *mongo.Client, user fiber.Router) {
 		_, err = userCollection.UpdateOne(context.Background(), bson.M{"_id": objId}, bson.M{"$set": user})
 		if err != nil {
 			return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+				"ok": false,
 				"error": "Internal Server Error",
 			})
 		}
@@ -136,6 +143,7 @@ func Me(client *mongo.Client, user fiber.Router) {
 		id, err := jwt.GetUserID(token, client)
 		if err != nil {
 			return c.Status(http.StatusUnauthorized).JSON(fiber.Map{
+				"ok": false,
 				"error": "wrong token",
 			})
 		}
@@ -145,7 +153,13 @@ func Me(client *mongo.Client, user fiber.Router) {
 		user := models.User{}
 		
 		objId, _ := primitive.ObjectIDFromHex(id)
-		_ = userCollection.FindOne(context.Background(), bson.M{"_id": objId}).Decode(&user)
+		err = userCollection.FindOne(context.Background(), bson.M{"_id": objId}).Decode(&user)
+		if err != nil {
+			return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+				"ok": false,
+				"error": "internal server error",
+			})
+		}
 
 		return c.Status(http.StatusOK).JSON(fiber.Map{
 			"ok": true,
